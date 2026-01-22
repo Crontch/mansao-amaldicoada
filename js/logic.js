@@ -152,41 +152,69 @@ const GameLogic = {
 
     runDiceGame(chest, isStealth, content, title, screen) {
         title.textContent = isStealth ? "ROUBO SILENCIOSO" : "DESAFIO DO BAÚ";
-        let target = isStealth ? 8 : 12;
         
-        // Gera modificador aleatório entre -5 e +5
-        let mod = Math.floor(Math.random() * 11) - 5;
-        let modText = mod >= 0 ? `+${mod}` : `${mod}`;
-        let modColor = mod >= 0 ? "#2ecc71" : "#e74c3c";
-
+        // Alvo aleatório entre 8 e 15
+        let target = isStealth ? (6 + Math.floor(Math.random() * 5)) : (10 + Math.floor(Math.random() * 8));
+        
         content.innerHTML = `
             <p style="margin-bottom:10px">Role o dado para abrir o baú.<br>Necessário: <b style="color:var(--gold)">${target}+</b></p>
-            <p style="font-size:1rem; margin-bottom:15px">Modificador da Sorte: <b style="color:${modColor}">${modText}</b></p>
+            <div id="mod-display" style="height: 30px; font-size: 1.1rem; margin-bottom: 10px; font-weight: bold;"></div>
             <div id="dice-result" class="dice-roll">?</div>
             <button class="btn" id="roll-dice-btn">🎲 ROLAR D20</button>
         `;
 
         document.getElementById('roll-dice-btn').onclick = () => {
-            document.getElementById('roll-dice-btn').disabled = true;
+            const btn = document.getElementById('roll-dice-btn');
+            btn.disabled = true;
+            
             let baseRoll = Math.floor(Math.random() * 20) + 1;
-            let finalRoll = baseRoll + mod;
             let diceEl = document.getElementById('dice-result');
+            let modEl = document.getElementById('mod-display');
             let counter = 0;
 
+            // 1. Animação do Dado
             let interval = setInterval(() => {
                 diceEl.textContent = Math.floor(Math.random() * 20) + 1;
-                if(++counter > 10) {
+                if(++counter > 12) {
                     clearInterval(interval);
-                    diceEl.innerHTML = `${baseRoll}<span style="font-size:1.5rem; vertical-align:middle; margin-left:10px; color:${modColor}">${modText} = ${finalRoll}</span>`;
-                    diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c";
+                    diceEl.textContent = baseRoll;
                     
+                    // 2. Pequena pausa dramática antes do modificador
                     setTimeout(() => {
-                        screen.classList.add('hidden');
-                        State.isBusy = false;
-                        this.resolveChest(chest, finalRoll >= target);
-                    }, 2000);
+                        // Chance de 70% de ter um modificador (para não perder a graça)
+                        let hasMod = Math.random() > 0.3;
+                        let mod = 0;
+                        
+                        if (hasMod) {
+                            mod = Math.floor(Math.random() * 11) - 5; // -5 a +5
+                            if (mod === 0) mod = 1; // Evitar modificador zero sem graça
+                            
+                            let modText = mod > 0 ? `+${mod}` : `${mod}`;
+                            let modColor = mod > 0 ? "#2ecc71" : "#e74c3c";
+                            
+                            modEl.style.color = modColor;
+                            modEl.textContent = `SURPRESA: ${modText}!`;
+                            
+                            // Animação de "shake" no dado se for negativo
+                            if (mod < 0) diceEl.style.animation = "shake 0.5s";
+                        }
+
+                        let finalRoll = baseRoll + mod;
+                        
+                        // 3. Revelar resultado final
+                        setTimeout(() => {
+                            diceEl.innerHTML = `${baseRoll}${mod !== 0 ? `<span style="font-size:1.5rem; margin-left:10px; opacity:0.7">${mod > 0 ? '+' : ''}${mod}</span>` : ''} = ${finalRoll}`;
+                            diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c";
+                            
+                            setTimeout(() => {
+                                screen.classList.add('hidden');
+                                State.isBusy = false;
+                                this.resolveChest(chest, finalRoll >= target);
+                            }, 1800);
+                        }, 800);
+                    }, 600);
                 }
-            }, 50);
+            }, 60);
         };
     },
 
