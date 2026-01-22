@@ -132,35 +132,150 @@ const GameLogic = {
 
     startMinigame(chest, isStealth = false) {
         State.isBusy = true;
-        const screen = document.getElementById('minigame-screen');
-        const content = document.getElementById('mg-content');
-        const title = document.getElementById('mg-title');
+        const screen = document.getElementById('minigame-screen'), 
+              content = document.getElementById('mg-content'), 
+              title = document.getElementById('mg-title');
         
         screen.classList.remove('hidden');
-        title.textContent = isStealth ? "ROUBO SILENCIOSO" : "DESAFIO DO BAÚ";
         
+        // Sorteia o tipo de minigame (1: Dado com Modificador, 2: Sequência de Cliques, 3: Reação Rápida)
+        const gameType = isStealth ? 1 : (Math.random() > 0.4 ? 1 : (Math.random() > 0.5 ? 2 : 3));
+        
+        if (gameType === 1) {
+            this.runDiceGame(chest, isStealth, content, title, screen);
+        } else if (gameType === 2) {
+            this.runSequenceGame(chest, content, title, screen);
+        } else {
+            this.runReactionGame(chest, content, title, screen);
+        }
+    },
+
+    runDiceGame(chest, isStealth, content, title, screen) {
+        title.textContent = isStealth ? "ROUBO SILENCIOSO" : "DESAFIO DO BAÚ";
         let target = isStealth ? 8 : 12;
         
+        // Gera modificador aleatório entre -5 e +5
+        let mod = Math.floor(Math.random() * 11) - 5;
+        let modText = mod >= 0 ? `+${mod}` : `${mod}`;
+        let modColor = mod >= 0 ? "#2ecc71" : "#e74c3c";
+
         content.innerHTML = `
-            <p style="margin-bottom:20px">Role o dado para abrir o baú.<br>Necessário: <b style="color:var(--gold)">${target}+</b></p>
+            <p style="margin-bottom:10px">Role o dado para abrir o baú.<br>Necessário: <b style="color:var(--gold)">${target}+</b></p>
+            <p style="font-size:1rem; margin-bottom:15px">Modificador da Sorte: <b style="color:${modColor}">${modText}</b></p>
             <div id="dice-result" class="dice-roll">?</div>
             <button class="btn" id="roll-dice-btn">🎲 ROLAR D20</button>
         `;
 
         document.getElementById('roll-dice-btn').onclick = () => {
             document.getElementById('roll-dice-btn').disabled = true;
-            let roll = Math.floor(Math.random() * 20) + 1;
+            let baseRoll = Math.floor(Math.random() * 20) + 1;
+            let finalRoll = baseRoll + mod;
             let diceEl = document.getElementById('dice-result');
-            
-            // Animação simples de rolagem
             let counter = 0;
+
             let interval = setInterval(() => {
                 diceEl.textContent = Math.floor(Math.random() * 20) + 1;
-                counter++;
-                if(counter > 10) {
+                if(++counter > 10) {
                     clearInterval(interval);
-                    diceEl.textContent = roll;
-                    diceEl.style.color = roll >= target ? "#2ecc71" : "#e74c3c";
+                    diceEl.innerHTML = `${baseRoll}<span style="font-size:1.5rem; vertical-align:middle; margin-left:10px; color:${modColor}">${modText} = ${finalRoll}</span>`;
+                    diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c";
+                    
+                    setTimeout(() => {
+                        screen.classList.add('hidden');
+                        State.isBusy = false;
+                        this.resolveChest(chest, finalRoll >= target);
+                    }, 2000);
+                }
+            }, 50);
+        };
+    },
+
+    runSequenceGame(chest, content, title, screen) {
+        title.textContent = "DESARMAR ARMADILHA";
+        content.innerHTML = `<p style="margin-bottom:20px">Clique nos botões na ordem correta!</p><div id="seq-btns" style="display:flex; gap:10px; justify-content:center"></div>`;
+        
+        const container = document.getElementById('seq-btns');
+        const nums = [1, 2, 3, 4].sort(() => Math.random() - 0.5);
+        let current = 1;
+
+        nums.forEach(n => {
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.style.width = '60px';
+            btn.textContent = n;
+            btn.onclick = () => {
+                if (n === current) {
+                    btn.style.background = "#2ecc71";
+                    btn.disabled = true;
+                    current++;
+                    if (current > 4) {
+                        setTimeout(() => {
+                            screen.classList.add('hidden');
+                            State.isBusy = false;
+                            this.resolveChest(chest, true);
+                        }, 500);
+                    }
+                } else {
+                    btn.style.background = "#e74c3c";
+                    setTimeout(() => {
+                        screen.classList.add('hidden');
+                        State.isBusy = false;
+                        this.resolveChest(chest, false);
+                    }, 500);
+                }
+            };
+            container.appendChild(btn);
+        });
+    },
+
+    runReactionGame(chest, content, title, screen) {
+        title.textContent = "REFLEXO RÁPIDO";
+        content.innerHTML = `<p style="margin-bottom:20px">Clique quando o botão ficar <b style="color:#2ecc71">VERDE</b>!</p><button id="react-btn" class="btn" style="width:200px; height:100px; font-size:1.5rem">AGUARDE...</button>`;
+        
+        const btn = document.getElementById('react-btn');
+        let canClick = false;
+        let startTime;
+
+        const waitTime = 1000 + Math.random() * 3000;
+        const timeout = setTimeout(() => {
+            btn.textContent = "CLIQUE AGORA!";
+            btn.style.background = "#2ecc71";
+            btn.style.color = "#000";
+            canClick = true;
+            startTime = Date.now();
+        }, waitTime);
+
+        btn.onclick = () => {
+            if (canClick) {
+                const reactionTime = Date.now() - startTime;
+                if (reactionTime < 700) { // 0.7 segundos para reagir
+                    btn.textContent = "SUCESSO!";
+                    setTimeout(() => {
+                        screen.classList.add('hidden');
+                        State.isBusy = false;
+                        this.resolveChest(chest, true);
+                    }, 800);
+                } else {
+                    btn.textContent = "LENTO DEMAIS!";
+                    btn.style.background = "#e74c3c";
+                    setTimeout(() => {
+                        screen.classList.add('hidden');
+                        State.isBusy = false;
+                        this.resolveChest(chest, false);
+                    }, 800);
+                }
+            } else {
+                clearTimeout(timeout);
+                btn.textContent = "CEDO DEMAIS!";
+                btn.style.background = "#e74c3c";
+                setTimeout(() => {
+                    screen.classList.add('hidden');
+                    State.isBusy = false;
+                    this.resolveChest(chest, false);
+                }, 800);
+            }
+        };
+    },l >= target ? "#2ecc71" : "#e74c3c";
                     
                     setTimeout(() => {
                         screen.classList.add('hidden');
