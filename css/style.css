@@ -1,0 +1,210 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&display=swap');
+
+:root {
+    --gold: #d4af37;
+    --gold-bright: #f1c40f;
+    --blood: #8b0000;
+    --bg-dark: #050505;
+    --panel-bg: #1a1a1a;
+    --border-color: #2c1e14;
+    --text-color: #e0e0e0;
+    
+    --p1: #e74c3c;
+    --p2: #2ecc71;
+    --p3: #3498db;
+    --p4: #f1c40f;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+}
+
+body {
+    background: var(--bg-dark);
+    color: var(--text-color);
+    font-family: 'Cinzel', serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-wrapper {
+    position: relative;
+    width: 1000px;
+    height: 850px;
+    background: var(--panel-bg);
+    border: 10px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 100px rgba(0,0,0,0.9);
+}
+
+#header {
+    height: 100px;
+    background: linear-gradient(to bottom, #2c1e14, #1a1a1a);
+    border-bottom: 3px solid var(--gold);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    z-index: 10;
+}
+
+.stat-box {
+    text-align: center;
+}
+
+.stat-box.actions {
+    display: flex;
+    gap: 15px;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#board-container {
+    flex: 1;
+    position: relative;
+    background: #080808;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+canvas {
+    background: #111;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    cursor: crosshair;
+}
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+    transition: opacity 0.5s ease;
+}
+
+.hidden {
+    display: none !important;
+    opacity: 0;
+}
+
+.menu-card, .modal {
+    background: var(--panel-bg);
+    padding: 50px;
+    border: 3px solid var(--gold);
+    text-align: center;
+    min-width: 400px;
+    box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
+    border-radius: 4px;
+}
+
+h1 {
+    color: var(--gold);
+    font-size: 4.5rem;
+    text-shadow: 0 0 20px var(--blood);
+    margin-bottom: 0;
+}
+
+.subtitle {
+    letter-spacing: 6px;
+    color: #888;
+    margin-bottom: 40px;
+    font-size: 0.9rem;
+}
+
+.btn {
+    background: #2c1e14;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+    padding: 12px 24px;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    font-weight: bold;
+    outline: none;
+}
+
+.btn:hover:not(:disabled) {
+    background: var(--gold);
+    color: #1a1a1a;
+    box-shadow: 0 0 15px var(--gold);
+    transform: translateY(-2px);
+}
+
+.btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
+#event-log {
+    position: absolute;
+    bottom: 25px;
+    left: 25px;
+    width: 320px;
+    height: 150px;
+    background: rgba(0,0,0,0.75);
+    border-left: 4px solid var(--gold);
+    padding: 15px;
+    font-size: 0.9rem;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column-reverse;
+    overflow: hidden;
+    font-family: 'MedievalSharp', cursive;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+}
+
+.log-entry {
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+#mg-content {
+    margin-top: 25px;
+    font-size: 1.4rem;
+}
+
+.dice-roll {
+    font-size: 5rem;
+    color: var(--gold-bright);
+    margin: 20px 0;
+    text-shadow: 0 0 20px rgba(241, 196, 15, 0.4);
+}

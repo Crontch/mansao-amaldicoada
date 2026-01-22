@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 A Mansão: O Tabuleiro Amaldiçoado - Definitive Edition</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-wrapper">
+        <!-- Interface Superior -->
+        <div id="header">
+            <div class="stat-box">
+                <div class="stat-label">Herói Atual</div>
+                <div id="player-name" class="stat-value">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Movimentos</div>
+                <div id="move-count" class="stat-value">0</div>
+            </div>
+            <div class="stat-box actions">
+                <button id="ability-btn" class="btn" title="Usar habilidade especial">Poder ✨</button>
+                <button id="pass-turn-btn" class="btn">Passar ⮞</button>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Relíquias</div>
+                <div id="relic-count" class="stat-value">0 / 3</div>
+            </div>
+        </div>
+
+        <!-- Área de Jogo -->
+        <div id="board-container">
+            <canvas id="boardCanvas"></canvas>
+            <div id="event-log"></div>
+        </div>
+
+        <!-- Tela Inicial -->
+        <div id="start-screen" class="overlay">
+            <div class="menu-card">
+                <h1>A MANSÃO</h1>
+                <p class="subtitle">O TABULEIRO AMALDIÇOADO</p>
+                <div class="setup-section">
+                    <label>Número de Jogadores:</label>
+                    <div id="player-select-buttons">
+                        <button class="btn" data-players="2">2 Jogadores</button>
+                        <button class="btn" data-players="3">3 Jogadores</button>
+                        <button class="btn" data-players="4">4 Jogadores</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Minigame -->
+        <div id="minigame-screen" class="overlay hidden">
+            <div class="modal">
+                <h2 id="mg-title">DESAFIO</h2>
+                <div id="mg-content"></div>
+            </div>
+        </div>
+
+        <!-- Tela de Game Over -->
+        <div id="game-over-screen" class="overlay hidden">
+            <div class="modal">
+                <h1 id="go-title">FIM DE JOGO</h1>
+                <p id="go-message"></p>
+                <button class="btn" onclick="location.reload()">Reiniciar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/logic.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
