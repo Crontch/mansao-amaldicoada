@@ -9,10 +9,20 @@ const UI = {
 
         document.getElementById('move-count').textContent = p.curM;
         document.getElementById('relic-count').textContent = `${State.relics} / ${CONFIG.relicsNeeded}`;
-        
-        const abilityBtn = document.getElementById('ability-btn');
+               const abilityBtn = document.getElementById(\'ability-btn\');
         abilityBtn.disabled = p.usedAbility;
         abilityBtn.title = p.abilityDesc;
+
+        const itemBtn = document.getElementById(\'item-btn\');
+        if (p.item) {
+            itemBtn.innerHTML = `${p.item.sym}`;
+            itemBtn.disabled = false;
+            itemBtn.title = `Usar ${p.item.name}: ${p.item.desc}`;
+        } else {
+            itemBtn.innerHTML = "🎒";
+            itemBtn.disabled = true;
+            itemBtn.title = \"Inventário vazio\";
+        }
     },
 
     log(message) {

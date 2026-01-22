@@ -14,6 +14,7 @@ const GameLogic = {
         });
 
         document.getElementById('ability-btn').onclick = () => this.useAbility();
+        document.getElementById('item-btn').onclick = () => this.useItem();
         document.getElementById('pass-turn-btn').onclick = () => this.passTurn();
     },
 
@@ -177,8 +178,9 @@ const GameLogic = {
         
         screen.classList.remove('hidden');
         
-        // Sorteia entre os 7 tipos de minigames agora
-        const gameType = isStealth ? 1 : Math.floor(Math.random() * 7) + 1;
+        // Sorteia entre os 6 tipos de minigames (removido Escolhido pelo Destino)
+        const gameTypes = [1, 2, 3, 4, 5, 7];
+        const gameType = isStealth ? 1 : gameTypes[Math.floor(Math.random() * gameTypes.length)];
         
         const finish = (success) => {
             if (State.mgTimer) clearInterval(State.mgTimer);
@@ -197,7 +199,7 @@ const GameLogic = {
             case 3: this.runReactionGame(content, title, finish); break;
             case 4: this.runCalyxGame(content, title, finish); break;
             case 5: this.runRuneMemoryGame(content, title, finish); break;
-            case 6: this.runRuneWheelGame(content, title, finish); break;
+            // case 6 removido
             case 7: this.runHeartbeatGame(content, title, finish); break;
         }
     },
@@ -371,21 +373,7 @@ const GameLogic = {
         });
     },
 
-    runRuneWheelGame(content, title, finish) {
-        title.textContent = "ESCOLHIDO PELO DESTINO";
-        const gameDiv = document.createElement('div');
-        gameDiv.innerHTML = `<div id="wheel" style="font-size:4rem; transition: transform 3s cubic-bezier(0.1, 0, 0.1, 1); margin: 20px 0;">🎡</div><p>Aguarde o destino...</p>`;
-        content.appendChild(gameDiv);
-        const wheel = document.getElementById('wheel');
-        const win = Math.random() > 0.5;
-        setTimeout(() => {
-            wheel.style.transform = `rotate(${win ? 1800 : 1620}deg)`;
-            setTimeout(() => {
-                wheel.textContent = win ? "🌟" : "🌑";
-                finish(win);
-            }, 3200);
-        }, 100);
-    },
+
 
     runHeartbeatGame(content, title, finish) {
         title.textContent = "FÔLEGO CURTO";
@@ -431,13 +419,76 @@ const GameLogic = {
                     UI.log("🏆 Mansão Purificada! O nível aumenta...");
                     setTimeout(() => { State.relics = 0; State.level++; this.generateLevel(); UI.update(); }, 1500);
                 }
-            } else UI.log("📦 O baú estava vazio...");
+            } else {
+                // Chance de encontrar item se não for relíquia
+                if (Math.random() > 0.4) {
+                    this.giveRandomItem();
+                } else {
+                    UI.log("📦 O baú estava vazio...");
+                }
+            }
         } else { 
-            UI.log("💀 Falha! O Fantasma despertou!"); 
-            State.ghost.active = true; 
-            State.ghostWaitTurn = true; // Aguarda um turno
+            // Amuleto de Proteção (Segunda Chance)
+            const p = State.players[State.turn];
+            if (p.item && p.item.id === 'amulet') {
+                UI.log("🧿 Amuleto quebrou e te protegeu!");
+                p.item = null;
+            } else {
+                UI.log("💀 Falha! O Fantasma despertou!"); 
+                State.ghost.active = true; 
+                State.ghostWaitTurn = true;
+            }
         }
         if (State.players[State.turn].curM <= 0) this.passTurn();
+        UI.update();
+    },
+
+    giveRandomItem() {
+        const items = [
+            { id: 'candle', name: 'Vela Sagrada', sym: '🕯️', desc: 'Revela área 3x3' },
+            { id: 'potion', name: 'Poção de Névoa', sym: '🧪', desc: 'Invisível por 1 turno' },
+            { id: 'salt', name: 'Armadilha de Sal', sym: '🪤', desc: 'Paralisa Fantasma' },
+            { id: 'amulet', name: 'Amuleto', sym: '🧿', desc: 'Proteção passiva' }
+        ];
+        const item = items[Math.floor(Math.random() * items.length)];
+        const p = State.players[State.turn];
+        if (!p.item) {
+            p.item = item;
+            UI.log(`🎒 Encontrou: ${item.name}!`);
+        } else {
+            UI.log("📦 Baú tinha um item, mas seu inventário está cheio!");
+        }
+    },
+
+    useItem() {
+        const p = State.players[State.turn];
+        if (!p.item || State.isBusy) return;
+
+        switch(p.item.id) {
+            case 'candle':
+                UI.log("🕯️ A luz da vela dissipa as sombras!");
+                for(let dx=-1; dx<=1; dx++) {
+                    for(let dy=-1; dy<=1; dy++) {
+                        let nx = p.x + dx, ny = p.y + dy;
+                        if(nx>=0 && nx<CONFIG.gridSize && ny>=0 && ny<CONFIG.gridSize) State.fog[nx][ny] = false;
+                    }
+                }
+                p.item = null;
+                break;
+            case 'potion':
+                UI.log("🧪 Você desapareceu na névoa!");
+                p.isInvisible = true;
+                p.item = null;
+                break;
+            case 'salt':
+                UI.log("🪤 Armadilha de sal colocada!");
+                State.saltTrap = { x: p.x, y: p.y };
+                p.item = null;
+                break;
+            case 'amulet':
+                UI.log("🧿 O Amuleto é passivo, protege contra falhas!");
+                return; // Não gasta o item clicando
+        }
         UI.update();
     },
 
@@ -465,18 +516,33 @@ const GameLogic = {
             return;
         }
 
+        // Armadilha de Sal
+        if (State.saltTrap && State.ghost.x === State.saltTrap.x && State.ghost.y === State.saltTrap.y) {
+            UI.log("👻 O Fantasma ficou preso no sal!");
+            State.saltTrap = null;
+            return;
+        }
+
         let target = null, minDist = Infinity;
         State.players.forEach(p => {
+            if (p.isInvisible) return; // Ignora jogadores invisíveis
             let d = Math.abs(p.x - State.ghost.x) + Math.abs(p.y - State.ghost.y);
             if (d < minDist) { minDist = d; target = p; }
         });
 
-        let moves = State.ghost.slow ? 1 : 3; // Agora anda 3 blocos
+        if (!target) {
+            UI.log("👻 O Fantasma não vê ninguém...");
+            return;
+        }
+
+        let moves = State.ghost.slow ? 1 : 3;
         for (let i = 0; i < moves; i++) {
             if (State.ghost.x < target.x) State.ghost.x++; else if (State.ghost.x > target.x) State.ghost.x--;
             else if (State.ghost.y < target.y) State.ghost.y++; else if (State.ghost.y > target.y) State.ghost.y--;
             
-            if (State.players.some(p => p.x === State.ghost.x && p.y === State.ghost.y)) {
+            // Só mata se o jogador não estiver invisível
+            const hitPlayer = State.players.find(p => p.x === State.ghost.x && p.y === State.ghost.y && !p.isInvisible);
+            if (hitPlayer) {
                 this.gameOver(false, "O Fantasma alcançou vocês!");
                 break;
             }
@@ -487,6 +553,8 @@ const GameLogic = {
         if (State.isBusy || !State.gameActive) return;
         let p = State.players[State.turn];
         p.curM = p.moves; p.usedAbility = false;
+        p.isInvisible = false; // Perde invisibilidade ao passar o turno
+        
         State.turn = (State.turn + 1) % State.players.length;
         if (State.turn === 0) this.moveGhost();
         this.startTurnTimer();
