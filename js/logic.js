@@ -201,9 +201,9 @@ const GameLogic = {
 
                         let finalRoll = baseRoll + mod;
                         
-                        // 3. Revelar resultado final
+                        // 3. Revelar resultado final simplificado
                         setTimeout(() => {
-                            diceEl.innerHTML = `${baseRoll}${mod !== 0 ? `<span style="font-size:1.5rem; margin-left:10px; opacity:0.7">${mod > 0 ? '+' : ''}${mod}</span>` : ''} = ${finalRoll}`;
+                            diceEl.textContent = finalRoll;
                             diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c";
                             
                             setTimeout(() => {

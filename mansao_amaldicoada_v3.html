@@ -542,7 +542,7 @@
                                 }
                                 let finalRoll = baseRoll + mod;
                                 setTimeout(() => {
-                                    diceEl.innerHTML = `${baseRoll}${mod !== 0 ? `<span style="font-size:1.5rem; margin-left:10px; opacity:0.7">${mod > 0 ? '+' : ''}${mod}</span>` : ''} = ${finalRoll}`;
+                                    diceEl.textContent = finalRoll;
                                     diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c";
                                     setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, finalRoll >= target); }, 1800);
                                 }, 800);
