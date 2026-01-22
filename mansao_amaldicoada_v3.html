@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 A Mansão: O Tabuleiro Amaldiçoado - Definitive Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&display=swap');
+
+        :root {
+            --gold: #d4af37;
+            --gold-bright: #f1c40f;
+            --blood: #8b0000;
+            --bg-dark: #050505;
+            --panel-bg: #1a1a1a;
+            --border-color: #2c1e14;
+            --text-color: #e0e0e0;
+            
+            --p1: #e74c3c;
+            --p2: #2ecc71;
+            --p3: #3498db;
+            --p4: #f1c40f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-color);
+            font-family: 'Cinzel', serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 1000px;
+            height: 850px;
+            background: var(--panel-bg);
+            border: 10px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 100px rgba(0,0,0,0.9);
+        }
+
+        #header {
+            height: 100px;
+            background: linear-gradient(to bottom, #2c1e14, #1a1a1a);
+            border-bottom: 3px solid var(--gold);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            z-index: 10;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-box.actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--gold);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #board-container {
+            flex: 1;
+            position: relative;
+            background: #080808;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        canvas {
+            background: #111;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            cursor: crosshair;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            transition: opacity 0.5s ease;
+        }
+
+        .hidden {
+            display: none !important;
+            opacity: 0;
+        }
+
+        .menu-card, .modal {
+            background: var(--panel-bg);
+            padding: 50px;
+            border: 3px solid var(--gold);
+            text-align: center;
+            min-width: 400px;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
+            border-radius: 4px;
+        }
+
+        h1 {
+            color: var(--gold);
+            font-size: 4.5rem;
+            text-shadow: 0 0 20px var(--blood);
+            margin-bottom: 0;
+        }
+
+        .subtitle {
+            letter-spacing: 6px;
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            background: #2c1e14;
+            color: var(--gold);
+            border: 1px solid var(--gold);
+            padding: 12px 24px;
+            font-family: 'Cinzel', serif;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-weight: bold;
+            outline: none;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--gold);
+            color: #1a1a1a;
+            box-shadow: 0 0 15px var(--gold);
+            transform: translateY(-2px);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        #event-log {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            width: 320px;
+            height: 150px;
+            background: rgba(0,0,0,0.75);
+            border-left: 4px solid var(--gold);
+            padding: 15px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column-reverse;
+            overflow: hidden;
+            font-family: 'MedievalSharp', cursive;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .log-entry {
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        #mg-content {
+            margin-top: 25px;
+            font-size: 1.4rem;
+        }
+
+        .dice-roll {
+            font-size: 5rem;
+            color: var(--gold-bright);
+            margin: 20px 0;
+            text-shadow: 0 0 20px rgba(241, 196, 15, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-wrapper">
+        <div id="header">
+            <div class="stat-box">
+                <div class="stat-label">Herói Atual</div>
+                <div id="player-name" class="stat-value">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Movimentos</div>
+                <div id="move-count" class="stat-value">0</div>
+            </div>
+            <div class="stat-box actions">
+                <button id="ability-btn" class="btn" title="Usar habilidade especial">Poder ✨</button>
+                <button id="pass-turn-btn" class="btn">Passar ⮞</button>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Relíquias</div>
+                <div id="relic-count" class="stat-value">0 / 3</div>
+            </div>
+        </div>
+
+        <div id="board-container">
+            <canvas id="boardCanvas"></canvas>
+            <div id="event-log"></div>
+        </div>
+
+        <div id="start-screen" class="overlay">
+            <div class="menu-card">
+                <h1>A MANSÃO</h1>
+                <p class="subtitle">O TABULEIRO AMALDIÇOADO</p>
+                <div class="setup-section">
+                    <label>Número de Jogadores:</label>
+                    <div id="player-select-buttons">
+                        <button class="btn" data-players="2">2 Jogadores</button>
+                        <button class="btn" data-players="3">3 Jogadores</button>
+                        <button class="btn" data-players="4">4 Jogadores</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="minigame-screen" class="overlay hidden">
+            <div class="modal">
+                <h2 id="mg-title">DESAFIO</h2>
+                <div id="mg-content"></div>
+            </div>
+        </div>
+
+        <div id="game-over-screen" class="overlay hidden">
+            <div class="modal">
+                <h1 id="go-title">FIM DE JOGO</h1>
+                <p id="go-message"></p>
+                <button class="btn" onclick="location.reload()">Reiniciar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIG
+        const CONFIG = {
+            gridSize: 12,
+            tileSize: 60,
+            relicsNeeded: 3,
+            classes: [
+                { id: 'atleta', name: 'Atleta', sym: '🏃', moves: 5, color: '#e74c3c', abilityDesc: 'Corrida Extra (+3 mov)' },
+                { id: 'ladrao', name: 'Ladrão', sym: '🕵️', moves: 4, color: '#2ecc71', abilityDesc: 'Abrir Baú Adjacente' },
+                { id: 'vidente', name: 'Vidente', sym: '👁️', moves: 4, color: '#3498db', abilityDesc: 'Revelar Baús no Mapa' },
+                { id: 'engenheiro', name: 'Engenheiro', sym: '⚙️', moves: 4, color: '#f1c40f', abilityDesc: 'Sabotar Fantasma (Lento)' }
+            ],
+            spawnPositions: [
+                { x: 0, y: 0 }, { x: 11, y: 0 }, { x: 0, y: 11 }, { x: 11, y: 11 }
+            ],
+            colors: {
+                fog: '#000000',
+                ground: '#0a0a0a',
+                grid: '#1a1a1a',
+                highlight: 'rgba(212, 175, 55, 0.2)'
+            }
+        };
+
+        let State = {
+            players: [],
+            turn: 0,
+            relics: 0,
+            chests: [],
+            fog: [],
+            ghost: {
+                x: 6, 
+                y: 6, 
+                active: false, 
+                slow: false,
+                sym: "👻",
+                slowSym: "🐌"
+            },
+            isBusy: false,
+            gameActive: false,
+            level: 1
+        };
+
+        // RENDERER
+        const Renderer = {
+            canvas: null,
+            ctx: null,
+            init() {
+                this.canvas = document.getElementById('boardCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.width = CONFIG.gridSize * CONFIG.tileSize;
+                this.canvas.height = CONFIG.gridSize * CONFIG.tileSize;
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const gx = Math.floor((e.clientX - rect.left) / CONFIG.tileSize);
+                    const gy = Math.floor((e.clientY - rect.top) / CONFIG.tileSize);
+                    GameLogic.handleTileClick(gx, gy);
+                });
+            },
+            draw() {
+                if (!this.ctx) return;
+                const ctx = this.ctx;
+                const { gridSize, tileSize } = CONFIG;
+                ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                for (let x = 0; x < gridSize; x++) {
+                    for (let y = 0; y < gridSize; y++) {
+                        const px = x * tileSize;
+                        const py = y * tileSize;
+                        if (State.fog[x] && State.fog[x][y]) {
+                            ctx.fillStyle = CONFIG.colors.fog;
+                            ctx.fillRect(px, py, tileSize, tileSize);
+                        } else {
+                            ctx.fillStyle = CONFIG.colors.ground;
+                            ctx.fillRect(px, py, tileSize, tileSize);
+                            const chest = State.chests.find(c => c.x === x && c.y === y && c.active);
+                            if (chest) this.drawEmoji("📦", x, y, 28, 42);
+                        }
+                        ctx.strokeStyle = CONFIG.colors.grid;
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(px, py, tileSize, tileSize);
+                    }
+                }
+                if (State.ghost.active) {
+                    const ghostEmoji = State.ghost.slow ? State.ghost.slowSym : State.ghost.sym;
+                    this.drawEmoji(ghostEmoji, State.ghost.x, State.ghost.y, 32, 45);
+                    const gx = State.ghost.x * tileSize + tileSize/2;
+                    const gy = State.ghost.y * tileSize + tileSize/2;
+                    const grad = ctx.createRadialGradient(gx, gy, 5, gx, gy, tileSize * 1.5);
+                    grad.addColorStop(0, 'rgba(139, 0, 0, 0.2)');
+                    grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(State.ghost.x * tileSize - tileSize, State.ghost.y * tileSize - tileSize, tileSize * 3, tileSize * 3);
+                }
+                State.players.forEach((p, idx) => {
+                    this.drawEmoji(p.sym, p.x, p.y, 32, 45);
+                    if (idx === State.turn) {
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(p.x * tileSize + 2, p.y * tileSize + 2, tileSize - 4, tileSize - 4);
+                    }
+                });
+            },
+            drawEmoji(emoji, x, y, size, yOffset) {
+                this.ctx.font = `${size}px serif`;
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(emoji, x * CONFIG.tileSize + CONFIG.tileSize / 2, y * CONFIG.tileSize + yOffset);
+            }
+        };
+
+        // UI
+        const UI = {
+            update() {
+                const p = State.players[State.turn];
+                if (!p) return;
+                const nameEl = document.getElementById('player-name');
+                nameEl.textContent = `${p.sym} ${p.name}`;
+                nameEl.style.color = p.color;
+                document.getElementById('move-count').textContent = p.curM;
+                document.getElementById('relic-count').textContent = `${State.relics} / ${CONFIG.relicsNeeded}`;
+                const abilityBtn = document.getElementById('ability-btn');
+                abilityBtn.disabled = p.usedAbility;
+                abilityBtn.title = p.abilityDesc;
+            },
+            log(message) {
+                const logEl = document.getElementById('event-log');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.textContent = `> ${message}`;
+                logEl.prepend(entry);
+                if (logEl.children.length > 8) logEl.removeChild(logEl.lastChild);
+            }
+        };
+
+        // LOGIC
+        const GameLogic = {
+            init() {
+                Renderer.init();
+                this.setupMenu();
+                this.gameLoop();
+            },
+            setupMenu() {
+                document.querySelectorAll('#player-select-buttons .btn').forEach(btn => {
+                    btn.onclick = () => {
+                        const count = parseInt(btn.dataset.players);
+                        this.startGame(count);
+                    };
+                });
+                document.getElementById('ability-btn').onclick = () => this.useAbility();
+                document.getElementById('pass-turn-btn').onclick = () => this.passTurn();
+            },
+            startGame(playerCount) {
+                State.players = [];
+                for (let i = 0; i < playerCount; i++) {
+                    const charClass = CONFIG.classes[i];
+                    State.players.push({
+                        ...charClass,
+                        x: CONFIG.spawnPositions[i].x,
+                        y: CONFIG.spawnPositions[i].y,
+                        curM: charClass.moves,
+                        usedAbility: false
+                    });
+                }
+                this.generateLevel();
+                State.gameActive = true;
+                document.getElementById('start-screen').classList.add('hidden');
+                UI.update();
+                UI.log("A aventura começou! Encontre as 3 relíquias.");
+            },
+            generateLevel() {
+                State.fog = Array(CONFIG.gridSize).fill().map(() => Array(CONFIG.gridSize).fill(true));
+                State.chests = [];
+                const chestCount = 8;
+                const relicIndices = this.getRandomIndices(chestCount, 3);
+                for (let i = 0; i < chestCount; i++) {
+                    let rx, ry;
+                    do {
+                        rx = Math.floor(Math.random() * CONFIG.gridSize);
+                        ry = Math.floor(Math.random() * CONFIG.gridSize);
+                    } while (State.chests.some(c => c.x === rx && c.y === ry) || CONFIG.spawnPositions.some(p => p.x === rx && p.y === ry));
+                    State.chests.push({ x: rx, y: ry, active: true, has: relicIndices.includes(i) });
+                }
+                State.ghost.x = 6; State.ghost.y = 6; State.ghost.active = false; State.ghost.slow = false;
+                this.updateFog();
+            },
+            getRandomIndices(total, count) {
+                let indices = [];
+                while(indices.length < count) {
+                    let r = Math.floor(Math.random() * total);
+                    if(!indices.includes(r)) indices.push(r);
+                }
+                return indices;
+            },
+            updateFog() {
+                State.players.forEach(p => {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        for (let dy = -2; dy <= 2; dy++) {
+                            let nx = p.x + dx, ny = p.y + dy;
+                            if (nx >= 0 && nx < CONFIG.gridSize && ny >= 0 && ny < CONFIG.gridSize) State.fog[nx][ny] = false;
+                        }
+                    }
+                });
+            },
+            handleTileClick(gx, gy) {
+                if (!State.gameActive || State.isBusy) return;
+                const p = State.players[State.turn];
+                const dist = Math.abs(p.x - gx) + Math.abs(p.y - gy);
+                if (dist === 1 && p.curM > 0) {
+                    p.x = gx; p.y = gy; p.curM--;
+                    this.updateFog(); this.checkCollisions(); UI.update();
+                }
+            },
+            checkCollisions() {
+                const p = State.players[State.turn];
+                const chest = State.chests.find(c => c.x === p.x && c.y === p.y && c.active);
+                if (chest) this.startMinigame(chest);
+                if (State.ghost.active && p.x === State.ghost.x && p.y === State.ghost.y) this.gameOver(false, "O Fantasma pegou você!");
+            },
+            startMinigame(chest, isStealth = false) {
+                State.isBusy = true;
+                const screen = document.getElementById('minigame-screen'), content = document.getElementById('mg-content'), title = document.getElementById('mg-title');
+                screen.classList.remove('hidden');
+                title.textContent = isStealth ? "ROUBO SILENCIOSO" : "DESAFIO DO BAÚ";
+                let target = isStealth ? 8 : 12;
+                content.innerHTML = `<p style="margin-bottom:20px">Role o dado para abrir o baú.<br>Necessário: <b style="color:var(--gold)">${target}+</b></p><div id="dice-result" class="dice-roll">?</div><button class="btn" id="roll-dice-btn">🎲 ROLAR D20</button>`;
+                document.getElementById('roll-dice-btn').onclick = () => {
+                    document.getElementById('roll-dice-btn').disabled = true;
+                    let roll = Math.floor(Math.random() * 20) + 1, diceEl = document.getElementById('dice-result'), counter = 0;
+                    let interval = setInterval(() => {
+                        diceEl.textContent = Math.floor(Math.random() * 20) + 1;
+                        if(++counter > 10) {
+                            clearInterval(interval); diceEl.textContent = roll;
+                            diceEl.style.color = roll >= target ? "#2ecc71" : "#e74c3c";
+                            setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, roll >= target); }, 1500);
+                        }
+                    }, 50);
+                };
+            },
+            resolveChest(chest, success) {
+                if (success) {
+                    chest.active = false;
+                    if (chest.has) {
+                        State.relics++; UI.log("✨ Relíquia encontrada!");
+                        if (State.relics >= CONFIG.relicsNeeded) {
+                            UI.log("🏆 Mansão Purificada! O nível aumenta...");
+                            setTimeout(() => { State.relics = 0; State.level++; this.generateLevel(); UI.update(); }, 1500);
+                        }
+                    } else UI.log("📦 O baú estava vazio...");
+                } else { UI.log("💀 Falha! O Fantasma despertou!"); State.ghost.active = true; }
+                if (State.players[State.turn].curM <= 0) this.passTurn();
+                UI.update();
+            },
+            useAbility() {
+                let p = State.players[State.turn];
+                if (p.usedAbility || State.isBusy) return;
+                let success = false;
+                switch(p.id) {
+                    case 'atleta': p.curM += 3; UI.log("🏃 Atleta usou fôlego extra!"); success = true; break;
+                    case 'vidente': UI.log("👁️ Vidente revelou os baús!"); State.chests.forEach(c => { if(c.active) State.fog[c.x][c.y] = false; }); success = true; break;
+                    case 'engenheiro': if (State.ghost.active) { State.ghost.slow = true; UI.log("⚙️ Engenheiro sabotou o Fantasma!"); success = true; } else UI.log("❌ O Fantasma ainda não apareceu!"); break;
+                    case 'ladrao':
+                        let adjChest = State.chests.find(c => c.active && (Math.abs(c.x - p.x) + Math.abs(c.y - p.y) === 1));
+                        if (adjChest) { this.startMinigame(adjChest, true); success = true; } else UI.log("❌ Nenhum baú adjacente!");
+                        break;
+                }
+                if (success) { p.usedAbility = true; UI.update(); }
+            },
+            moveGhost() {
+                if (!State.ghost.active) return;
+                let target = null, minDist = Infinity;
+                State.players.forEach(p => {
+                    let d = Math.abs(p.x - State.ghost.x) + Math.abs(p.y - State.ghost.y);
+                    if (d < minDist) { minDist = d; target = p; }
+                });
+                let moves = State.ghost.slow ? 1 : 2;
+                for (let i = 0; i < moves; i++) {
+                    if (State.ghost.x < target.x) State.ghost.x++; else if (State.ghost.x > target.x) State.ghost.x--;
+                    else if (State.ghost.y < target.y) State.ghost.y++; else if (State.ghost.y > target.y) State.ghost.y--;
+                    if (State.players.some(p => p.x === State.ghost.x && p.y === State.ghost.y)) { this.gameOver(false, "O Fantasma alcançou vocês!"); break; }
+                }
+            },
+            passTurn() {
+                if (State.isBusy || !State.gameActive) return;
+                let p = State.players[State.turn];
+                p.curM = p.moves; p.usedAbility = false;
+                State.turn = (State.turn + 1) % State.players.length;
+                if (State.turn === 0) this.moveGhost();
+                UI.update(); UI.log(`Turno de: ${State.players[State.turn].name}`);
+            },
+            gameOver(win, message) {
+                State.gameActive = false;
+                const screen = document.getElementById('game-over-screen');
+                document.getElementById('go-title').textContent = win ? "VITÓRIA!" : "DERROTA";
+                document.getElementById('go-message').textContent = message;
+                screen.classList.remove('hidden');
+            },
+            gameLoop() { Renderer.draw(); requestAnimationFrame(() => this.gameLoop()); }
+        };
+
+        window.onload = () => GameLogic.init();
+    </script>
+</body>
+</html>
