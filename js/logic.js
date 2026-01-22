@@ -39,7 +39,13 @@ const GameLogic = {
 
     generateLevel() {
         // Resetar Fog
-        State.fog = Array(CONFIG.gridSize).fill().map(() => Array(CONFIG.gridSize).fill(true));
+        State.fog = [];
+        for (let x = 0; x < CONFIG.gridSize; x++) {
+            State.fog[x] = [];
+            for (let y = 0; y < CONFIG.gridSize; y++) {
+                State.fog[x][y] = true;
+            }
+        }
         
         // Resetar Baús
         State.chests = [];

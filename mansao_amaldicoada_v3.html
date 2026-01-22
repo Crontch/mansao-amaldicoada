@@ -442,7 +442,13 @@
                 UI.log("A aventura começou! Encontre as 3 relíquias.");
             },
             generateLevel() {
-                State.fog = Array(CONFIG.gridSize).fill().map(() => Array(CONFIG.gridSize).fill(true));
+                State.fog = [];
+                for (let x = 0; x < CONFIG.gridSize; x++) {
+                    State.fog[x] = [];
+                    for (let y = 0; y < CONFIG.gridSize; y++) {
+                        State.fog[x][y] = true;
+                    }
+                }
                 State.chests = [];
                 const chestCount = 8;
                 const relicIndices = this.getRandomIndices(chestCount, 3);
