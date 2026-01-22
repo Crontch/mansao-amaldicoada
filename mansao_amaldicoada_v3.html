@@ -247,6 +247,10 @@
                 <button id="pass-turn-btn" class="btn">Passar ⮞</button>
             </div>
             <div class="stat-box">
+                <div class="stat-label">Tempo</div>
+                <div id="timer-display" class="stat-value" style="color: #e74c3c;">60s</div>
+            </div>
+            <div class="stat-box">
                 <div class="stat-label">Relíquias</div>
                 <div id="relic-count" class="stat-value">0 / 3</div>
             </div>
@@ -289,11 +293,12 @@
     </div>
 
     <script>
-        // CONFIG
         const CONFIG = {
             gridSize: 12,
             tileSize: 60,
             relicsNeeded: 3,
+            turnTimeLimit: 60,
+            minigameTimeLimit: 40,
             classes: [
                 { id: 'atleta', name: 'Atleta', sym: '🏃', moves: 5, color: '#e74c3c', abilityDesc: 'Corrida Extra (+3 mov)' },
                 { id: 'ladrao', name: 'Ladrão', sym: '🕵️', moves: 4, color: '#2ecc71', abilityDesc: 'Abrir Baú Adjacente' },
@@ -318,22 +323,20 @@
             chests: [],
             fog: [],
             ghost: {
-                x: 6, 
-                y: 6, 
-                active: false, 
-                slow: false,
-                sym: "👻",
-                slowSym: "🐌"
+                x: 6, y: 6, active: false, slow: false,
+                sym: "👻", slowSym: "🐌"
             },
             isBusy: false,
             gameActive: false,
-            level: 1
+            level: 1,
+            turnTimer: null,
+            mgTimer: null,
+            timeLeft: 0,
+            ghostWaitTurn: false
         };
 
-        // RENDERER
         const Renderer = {
-            canvas: null,
-            ctx: null,
+            canvas: null, ctx: null,
             init() {
                 this.canvas = document.getElementById('boardCanvas');
                 this.ctx = this.canvas.getContext('2d');
@@ -353,86 +356,61 @@
                 ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 for (let x = 0; x < gridSize; x++) {
                     for (let y = 0; y < gridSize; y++) {
-                        const px = x * tileSize;
-                        const py = y * tileSize;
+                        const px = x * tileSize, py = y * tileSize;
                         if (State.fog[x] && State.fog[x][y]) {
-                            ctx.fillStyle = CONFIG.colors.fog;
-                            ctx.fillRect(px, py, tileSize, tileSize);
+                            ctx.fillStyle = CONFIG.colors.fog; ctx.fillRect(px, py, tileSize, tileSize);
                         } else {
-                            ctx.fillStyle = CONFIG.colors.ground;
-                            ctx.fillRect(px, py, tileSize, tileSize);
+                            ctx.fillStyle = CONFIG.colors.ground; ctx.fillRect(px, py, tileSize, tileSize);
                             const chest = State.chests.find(c => c.x === x && c.y === y && c.active);
                             if (chest) this.drawEmoji("📦", x, y, 28, 42);
                         }
-                        ctx.strokeStyle = CONFIG.colors.grid;
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(px, py, tileSize, tileSize);
+                        ctx.strokeStyle = CONFIG.colors.grid; ctx.lineWidth = 1; ctx.strokeRect(px, py, tileSize, tileSize);
                     }
                 }
                 if (State.ghost.active) {
                     const ghostEmoji = State.ghost.slow ? State.ghost.slowSym : State.ghost.sym;
                     this.drawEmoji(ghostEmoji, State.ghost.x, State.ghost.y, 32, 45);
-                    const gx = State.ghost.x * tileSize + tileSize/2;
-                    const gy = State.ghost.y * tileSize + tileSize/2;
+                    const gx = State.ghost.x * tileSize + tileSize/2, gy = State.ghost.y * tileSize + tileSize/2;
                     const grad = ctx.createRadialGradient(gx, gy, 5, gx, gy, tileSize * 1.5);
-                    grad.addColorStop(0, 'rgba(139, 0, 0, 0.2)');
-                    grad.addColorStop(1, 'transparent');
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(State.ghost.x * tileSize - tileSize, State.ghost.y * tileSize - tileSize, tileSize * 3, tileSize * 3);
+                    grad.addColorStop(0, 'rgba(139, 0, 0, 0.2)'); grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad; ctx.fillRect(State.ghost.x * tileSize - tileSize, State.ghost.y * tileSize - tileSize, tileSize * 3, tileSize * 3);
                 }
                 State.players.forEach((p, idx) => {
                     this.drawEmoji(p.sym, p.x, p.y, 32, 45);
                     if (idx === State.turn) {
-                        ctx.strokeStyle = p.color;
-                        ctx.lineWidth = 3;
-                        ctx.strokeRect(p.x * tileSize + 2, p.y * tileSize + 2, tileSize - 4, tileSize - 4);
+                        ctx.strokeStyle = p.color; ctx.lineWidth = 3; ctx.strokeRect(p.x * tileSize + 2, p.y * tileSize + 2, tileSize - 4, tileSize - 4);
                     }
                 });
             },
             drawEmoji(emoji, x, y, size, yOffset) {
-                this.ctx.font = `${size}px serif`;
-                this.ctx.textAlign = "center";
+                this.ctx.font = `${size}px serif`; this.ctx.textAlign = "center";
                 this.ctx.fillText(emoji, x * CONFIG.tileSize + CONFIG.tileSize / 2, y * CONFIG.tileSize + yOffset);
             }
         };
 
-        // UI
         const UI = {
             update() {
-                const p = State.players[State.turn];
-                if (!p) return;
+                const p = State.players[State.turn]; if (!p) return;
                 const nameEl = document.getElementById('player-name');
-                nameEl.textContent = `${p.sym} ${p.name}`;
-                nameEl.style.color = p.color;
+                nameEl.textContent = `${p.sym} ${p.name}`; nameEl.style.color = p.color;
                 document.getElementById('move-count').textContent = p.curM;
                 document.getElementById('relic-count').textContent = `${State.relics} / ${CONFIG.relicsNeeded}`;
                 const abilityBtn = document.getElementById('ability-btn');
-                abilityBtn.disabled = p.usedAbility;
-                abilityBtn.title = p.abilityDesc;
+                abilityBtn.disabled = p.usedAbility; abilityBtn.title = p.abilityDesc;
             },
             log(message) {
                 const logEl = document.getElementById('event-log');
-                const entry = document.createElement('div');
-                entry.className = 'log-entry';
-                entry.textContent = `> ${message}`;
-                logEl.prepend(entry);
+                const entry = document.createElement('div'); entry.className = 'log-entry';
+                entry.textContent = `> ${message}`; logEl.prepend(entry);
                 if (logEl.children.length > 8) logEl.removeChild(logEl.lastChild);
             }
         };
 
-        // LOGIC
         const GameLogic = {
-            init() {
-                Renderer.init();
-                this.setupMenu();
-                this.gameLoop();
-            },
+            init() { Renderer.init(); this.setupMenu(); this.gameLoop(); },
             setupMenu() {
                 document.querySelectorAll('#player-select-buttons .btn').forEach(btn => {
-                    btn.onclick = () => {
-                        const count = parseInt(btn.dataset.players);
-                        this.startGame(count);
-                    };
+                    btn.onclick = () => { const count = parseInt(btn.dataset.players); this.startGame(count); };
                 });
                 document.getElementById('ability-btn').onclick = () => this.useAbility();
                 document.getElementById('pass-turn-btn').onclick = () => this.passTurn();
@@ -441,48 +419,30 @@
                 State.players = [];
                 for (let i = 0; i < playerCount; i++) {
                     const charClass = CONFIG.classes[i];
-                    State.players.push({
-                        ...charClass,
-                        x: CONFIG.spawnPositions[i].x,
-                        y: CONFIG.spawnPositions[i].y,
-                        curM: charClass.moves,
-                        usedAbility: false
-                    });
+                    State.players.push({ ...charClass, x: CONFIG.spawnPositions[i].x, y: CONFIG.spawnPositions[i].y, curM: charClass.moves, usedAbility: false });
                 }
-                this.generateLevel();
-                State.gameActive = true;
+                this.generateLevel(); State.gameActive = true;
                 document.getElementById('start-screen').classList.add('hidden');
-                UI.update();
-                UI.log("A aventura começou! Encontre as 3 relíquias.");
+                UI.update(); UI.log("A aventura começou! Encontre as 3 relíquias.");
+                this.startTurnTimer();
             },
             generateLevel() {
                 State.fog = [];
                 for (let x = 0; x < CONFIG.gridSize; x++) {
-                    State.fog[x] = [];
-                    for (let y = 0; y < CONFIG.gridSize; y++) {
-                        State.fog[x][y] = true;
-                    }
+                    State.fog[x] = []; for (let y = 0; y < CONFIG.gridSize; y++) State.fog[x][y] = true;
                 }
-                State.chests = [];
-                const chestCount = 8;
-                const relicIndices = this.getRandomIndices(chestCount, 3);
+                State.chests = []; const chestCount = 8; const relicIndices = this.getRandomIndices(chestCount, 3);
                 for (let i = 0; i < chestCount; i++) {
                     let rx, ry;
-                    do {
-                        rx = Math.floor(Math.random() * CONFIG.gridSize);
-                        ry = Math.floor(Math.random() * CONFIG.gridSize);
-                    } while (State.chests.some(c => c.x === rx && c.y === ry) || CONFIG.spawnPositions.some(p => p.x === rx && p.y === ry));
+                    do { rx = Math.floor(Math.random() * CONFIG.gridSize); ry = Math.floor(Math.random() * CONFIG.gridSize); }
+                    while (State.chests.some(c => c.x === rx && c.y === ry) || CONFIG.spawnPositions.some(p => p.x === rx && p.y === ry));
                     State.chests.push({ x: rx, y: ry, active: true, has: relicIndices.includes(i) });
                 }
-                State.ghost.x = 6; State.ghost.y = 6; State.ghost.active = false; State.ghost.slow = false;
+                State.ghost.x = 6; State.ghost.y = 6; State.ghost.active = false; State.ghost.slow = false; State.ghostWaitTurn = false;
                 this.updateFog();
             },
             getRandomIndices(total, count) {
-                let indices = [];
-                while(indices.length < count) {
-                    let r = Math.floor(Math.random() * total);
-                    if(!indices.includes(r)) indices.push(r);
-                }
+                let indices = []; while(indices.length < count) { let r = Math.floor(Math.random() * total); if(!indices.includes(r)) indices.push(r); }
                 return indices;
             },
             updateFog() {
@@ -495,14 +455,35 @@
                     }
                 });
             },
+            startTurnTimer() {
+                if (State.turnTimer) clearInterval(State.turnTimer);
+                State.timeLeft = CONFIG.turnTimeLimit; this.updateTimerUI();
+                State.turnTimer = setInterval(() => {
+                    if (!State.isBusy && State.gameActive) {
+                        State.timeLeft--; this.updateTimerUI();
+                        if (State.timeLeft <= 0) { UI.log("⏰ Tempo esgotado!"); this.passTurn(); }
+                    }
+                }, 1000);
+            },
+            startMinigameTimer(callback) {
+                if (State.mgTimer) clearInterval(State.mgTimer);
+                let mgTime = CONFIG.minigameTimeLimit;
+                const timerDisplay = document.createElement('div');
+                timerDisplay.id = "mg-timer"; timerDisplay.style.cssText = "font-size: 1.5rem; color: #e74c3c; margin-bottom: 10px; font-weight: bold;";
+                timerDisplay.textContent = `Tempo: ${mgTime}s`; document.getElementById('mg-content').prepend(timerDisplay);
+                State.mgTimer = setInterval(() => {
+                    mgTime--; timerDisplay.textContent = `Tempo: ${mgTime}s`;
+                    if (mgTime <= 0) { clearInterval(State.mgTimer); UI.log("⏰ Tempo do minigame esgotado!"); callback(false); }
+                }, 1000);
+            },
+            updateTimerUI() {
+                const el = document.getElementById('timer-display');
+                if (el) { el.textContent = `${State.timeLeft}s`; el.style.color = State.timeLeft <= 10 ? "#ff0000" : "#e74c3c"; }
+            },
             handleTileClick(gx, gy) {
                 if (!State.gameActive || State.isBusy) return;
-                const p = State.players[State.turn];
-                const dist = Math.abs(p.x - gx) + Math.abs(p.y - gy);
-                if (dist === 1 && p.curM > 0) {
-                    p.x = gx; p.y = gy; p.curM--;
-                    this.updateFog(); this.checkCollisions(); UI.update();
-                }
+                const p = State.players[State.turn]; const dist = Math.abs(p.x - gx) + Math.abs(p.y - gy);
+                if (dist === 1 && p.curM > 0) { p.x = gx; p.y = gy; p.curM--; this.updateFog(); this.checkCollisions(); UI.update(); }
             },
             checkCollisions() {
                 const p = State.players[State.turn];
@@ -512,21 +493,32 @@
             },
             startMinigame(chest, isStealth = false) {
                 State.isBusy = true;
-                const screen = document.getElementById('minigame-screen'), 
-                      content = document.getElementById('mg-content'), 
-                      title = document.getElementById('mg-title');
-                screen.classList.remove('hidden');
-                const gameType = isStealth ? 1 : (Math.random() > 0.4 ? 1 : (Math.random() > 0.5 ? 2 : 3));
-                if (gameType === 1) this.runDiceGame(chest, isStealth, content, title, screen);
-                else if (gameType === 2) this.runSequenceGame(chest, content, title, screen);
-                else this.runReactionGame(chest, content, title, screen);
+                const screen = document.getElementById('minigame-screen'), content = document.getElementById('mg-content'), title = document.getElementById('mg-title');
+                screen.classList.remove('hidden'); content.innerHTML = "";
+                const gameType = isStealth ? 1 : Math.floor(Math.random() * 7) + 1;
+                const finish = (success) => {
+                    if (State.mgTimer) clearInterval(State.mgTimer);
+                    setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, success); }, 1500);
+                };
+                this.startMinigameTimer(finish);
+                switch(gameType) {
+                    case 1: this.runDiceGame(chest, isStealth, content, title, finish); break;
+                    case 2: this.runSequenceGame(content, title, finish); break;
+                    case 3: this.runReactionGame(content, title, finish); break;
+                    case 4: this.runCalyxGame(content, title, finish); break;
+                    case 5: this.runRuneMemoryGame(content, title, finish); break;
+                    case 6: this.runRuneWheelGame(content, title, finish); break;
+                    case 7: this.runHeartbeatGame(content, title, finish); break;
+                }
             },
-            runDiceGame(chest, isStealth, content, title, screen) {
+            runDiceGame(chest, isStealth, content, title, finish) {
                 title.textContent = isStealth ? "ROUBO SILENCIOSO" : "DESAFIO DO BAÚ";
                 let target = isStealth ? (6 + Math.floor(Math.random() * 5)) : (10 + Math.floor(Math.random() * 8));
-                content.innerHTML = `<p style="margin-bottom:10px">Role o dado para abrir o baú.<br>Necessário: <b style="color:var(--gold)">${target}+</b></p><div id="mod-display" style="height: 30px; font-size: 1.1rem; margin-bottom: 10px; font-weight: bold;"></div><div id="dice-result" class="dice-roll">?</div><button class="btn" id="roll-dice-btn">🎲 ROLAR D20</button>`;
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<p style="margin-bottom:10px">Role o dado para abrir o baú.<br>Necessário: <b style="color:var(--gold)">${target}+</b></p><div id="mod-display" style="height: 30px; font-size: 1.1rem; margin-bottom: 10px; font-weight: bold;"></div><div id="dice-result" class="dice-roll">?</div><button class="btn" id="roll-dice-btn">🎲 ROLAR D20</button>`;
+                content.appendChild(gameDiv);
                 document.getElementById('roll-dice-btn').onclick = () => {
-                    const btn = document.getElementById('roll-dice-btn'); btn.disabled = true;
+                    document.getElementById('roll-dice-btn').disabled = true;
                     let baseRoll = Math.floor(Math.random() * 20) + 1, diceEl = document.getElementById('dice-result'), modEl = document.getElementById('mod-display'), counter = 0;
                     let interval = setInterval(() => {
                         diceEl.textContent = Math.floor(Math.random() * 20) + 1;
@@ -536,64 +528,128 @@
                                 let hasMod = Math.random() > 0.3, mod = 0;
                                 if (hasMod) {
                                     mod = Math.floor(Math.random() * 11) - 5; if (mod === 0) mod = 1;
-                                    let modText = mod > 0 ? `+${mod}` : `${mod}`, modColor = mod > 0 ? "#2ecc71" : "#e74c3c";
-                                    modEl.style.color = modColor; modEl.textContent = `SURPRESA: ${modText}!`;
+                                    modEl.style.color = mod > 0 ? "#2ecc71" : "#e74c3c"; modEl.textContent = `MODIFICADOR: ${mod > 0 ? '+' : ''}${mod}!`;
                                     if (mod < 0) diceEl.style.animation = "shake 0.5s";
                                 }
                                 let finalRoll = baseRoll + mod;
-                                setTimeout(() => {
-                                    diceEl.textContent = finalRoll;
-                                    diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c";
-                                    setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, finalRoll >= target); }, 1800);
-                                }, 800);
+                                setTimeout(() => { diceEl.textContent = finalRoll; diceEl.style.color = finalRoll >= target ? "#2ecc71" : "#e74c3c"; finish(finalRoll >= target); }, 800);
                             }, 600);
                         }
                     }, 60);
                 };
             },
-            runSequenceGame(chest, content, title, screen) {
+            runSequenceGame(content, title, finish) {
                 title.textContent = "DESARMAR ARMADILHA";
-                content.innerHTML = `<p style="margin-bottom:20px">Clique nos botões na ordem correta!</p><div id="seq-btns" style="display:flex; gap:10px; justify-content:center"></div>`;
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<p style="margin-bottom:20px">Clique na ordem correta!</p><div id="seq-btns" style="display:flex; gap:10px; justify-content:center"></div>`;
+                content.appendChild(gameDiv);
                 const container = document.getElementById('seq-btns'), nums = [1, 2, 3, 4].sort(() => Math.random() - 0.5);
                 let current = 1;
                 nums.forEach(n => {
                     const btn = document.createElement('button'); btn.className = 'btn'; btn.style.width = '60px'; btn.textContent = n;
                     btn.onclick = () => {
-                        if (n === current) {
-                            btn.style.background = "#2ecc71"; btn.disabled = true; current++;
-                            if (current > 4) setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, true); }, 500);
-                        } else {
-                            btn.style.background = "#e74c3c";
-                            setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, false); }, 500);
-                        }
+                        if (n === current) { btn.style.background = "#2ecc71"; btn.disabled = true; current++; if (current > 4) finish(true); }
+                        else { btn.style.background = "#e74c3c"; finish(false); }
                     };
                     container.appendChild(btn);
                 });
             },
-            runReactionGame(chest, content, title, screen) {
+            runReactionGame(content, title, finish) {
                 title.textContent = "REFLEXO RÁPIDO";
-                content.innerHTML = `<p style="margin-bottom:20px">Clique quando o botão ficar <b style="color:#2ecc71">VERDE</b>!</p><button id="react-btn" class="btn" style="width:200px; height:100px; font-size:1.5rem">AGUARDE...</button>`;
-                const btn = document.getElementById('react-btn');
-                let canClick = false, startTime;
-                const waitTime = 1000 + Math.random() * 3000;
-                const timeout = setTimeout(() => {
-                    btn.textContent = "CLIQUE AGORA!"; btn.style.background = "#2ecc71"; btn.style.color = "#000"; canClick = true; startTime = Date.now();
-                }, waitTime);
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<p style="margin-bottom:20px">Clique quando ficar <b style="color:#2ecc71">VERDE</b>!</p><button id="react-btn" class="btn" style="width:200px; height:100px; font-size:1.5rem">AGUARDE...</button>`;
+                content.appendChild(gameDiv);
+                const btn = document.getElementById('react-btn'); let canClick = false, startTime;
+                const timeout = setTimeout(() => { btn.textContent = "CLIQUE!"; btn.style.background = "#2ecc71"; btn.style.color = "#000"; canClick = true; startTime = Date.now(); }, 1000 + Math.random() * 3000);
                 btn.onclick = () => {
                     if (canClick) {
                         const reactionTime = Date.now() - startTime;
-                        if (reactionTime < 700) {
-                            btn.textContent = "SUCESSO!";
-                            setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, true); }, 800);
-                        } else {
-                            btn.textContent = "LENTO DEMAIS!"; btn.style.background = "#e74c3c";
-                            setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, false); }, 800);
-                        }
-                    } else {
-                        clearTimeout(timeout); btn.textContent = "CEDO DEMAIS!"; btn.style.background = "#e74c3c";
-                        setTimeout(() => { screen.classList.add('hidden'); State.isBusy = false; this.resolveChest(chest, false); }, 800);
-                    }
+                        if (reactionTime < 700) { btn.textContent = "SUCESSO!"; finish(true); }
+                        else { btn.textContent = "LENTO!"; btn.style.background = "#e74c3c"; finish(false); }
+                    } else { clearTimeout(timeout); btn.textContent = "CEDO!"; btn.style.background = "#e74c3c"; finish(false); }
                 };
+            },
+            runCalyxGame(content, title, finish) {
+                title.textContent = "BANQUETE DAS SOMBRAS";
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<p style="margin-bottom:20px">Escolha um cálice. Cuidado com a maldição!</p><div id="calyx-btns" style="display:flex; gap:20px; justify-content:center; font-size:3rem"></div>`;
+                content.appendChild(gameDiv);
+                const container = document.getElementById('calyx-btns'), types = ['relic', 'empty', 'curse'].sort(() => Math.random() - 0.5);
+                setTimeout(() => {
+                    const curseIdx = types.indexOf('curse'), curseBtn = container.children[curseIdx];
+                    curseBtn.style.textShadow = "0 0 20px #8b0000"; setTimeout(() => curseBtn.style.textShadow = "none", 400);
+                }, 800);
+                types.forEach((type, i) => {
+                    const btn = document.createElement('div'); btn.style.cursor = 'pointer'; btn.textContent = "🍷";
+                    btn.onclick = () => {
+                        if (type === 'relic') { btn.textContent = "✨"; finish(true); }
+                        else if (type === 'empty') { btn.textContent = "💨"; finish(true); }
+                        else { btn.textContent = "💀"; UI.log("💀 Maldição! O Fantasma se aproxima!"); this.moveGhostTowardsPlayer(); finish(false); }
+                    };
+                    container.appendChild(btn);
+                });
+            },
+            moveGhostTowardsPlayer() {
+                if (!State.ghost.active) return;
+                const p = State.players[State.turn];
+                if (State.ghost.x < p.x) State.ghost.x++; else if (State.ghost.x > p.x) State.ghost.x--;
+                if (State.ghost.y < p.y) State.ghost.y++; else if (State.ghost.y > p.y) State.ghost.y--;
+            },
+            runRuneMemoryGame(content, title, finish) {
+                title.textContent = "FECHADURA DE ALMAS";
+                const runes = ['🔮', '📜', '🕯️', '💀'], sequence = [];
+                for(let i=0; i<3; i++) sequence.push(runes[Math.floor(Math.random()*runes.length)]);
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<p id="rune-msg" style="margin-bottom:20px">Memorize a sequência!</p><div id="rune-display" style="font-size:3rem; margin-bottom:20px; height:60px"></div><div id="rune-btns" class="hidden" style="display:flex; gap:10px; justify-content:center"></div>`;
+                content.appendChild(gameDiv);
+                const display = document.getElementById('rune-display'); let step = 0;
+                const showNext = () => {
+                    if(step < sequence.length) { display.textContent = sequence[step]; setTimeout(() => { display.textContent = ""; step++; setTimeout(showNext, 200); }, 800); }
+                    else { document.getElementById('rune-msg').textContent = "Repita a sequência!"; document.getElementById('rune-btns').classList.remove('hidden'); }
+                };
+                setTimeout(showNext, 500);
+                const btnContainer = document.getElementById('rune-btns'); let userStep = 0;
+                runes.forEach(r => {
+                    const btn = document.createElement('button'); btn.className = 'btn'; btn.style.fontSize = '1.5rem'; btn.textContent = r;
+                    btn.onclick = () => {
+                        if(r === sequence[userStep]) { userStep++; if(userStep === sequence.length) { display.textContent = "✔️"; finish(true); } }
+                        else { display.textContent = "❌"; finish(false); }
+                    };
+                    btnContainer.appendChild(btn);
+                });
+            },
+            runRuneWheelGame(content, title, finish) {
+                title.textContent = "ESCOLHIDO PELO DESTINO";
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<div id="wheel" style="font-size:4rem; transition: transform 3s cubic-bezier(0.1, 0, 0.1, 1); margin: 20px 0;">🎡</div><p>Aguarde o destino...</p>`;
+                content.appendChild(gameDiv);
+                const wheel = document.getElementById('wheel'), win = Math.random() > 0.5;
+                setTimeout(() => {
+                    wheel.style.transform = `rotate(${win ? 1800 : 1620}deg)`;
+                    setTimeout(() => { wheel.textContent = win ? "🌟" : "🌑"; finish(win); }, 3200);
+                }, 100);
+            },
+            runHeartbeatGame(content, title, finish) {
+                title.textContent = "FÔLEGO CURTO";
+                const gameDiv = document.createElement('div');
+                gameDiv.innerHTML = `<p style="margin-bottom:15px">Mantenha a barra na zona <b style="color:#2ecc71">VERDE</b>!</p>
+                    <div style="width:100%; height:30px; background:#333; position:relative; border-radius:15px; overflow:hidden">
+                        <div id="safe-zone" style="position:absolute; width:30%; height:100%; background:rgba(46, 204, 113, 0.4); left:35%"></div>
+                        <div id="heart-bar" style="position:absolute; width:10px; height:100%; background:#fff; left:50%"></div>
+                    </div>
+                    <p style="margin-top:15px; font-size:0.9rem">Pressione ESPAÇO ou CLIQUE para mover</p>`;
+                content.appendChild(gameDiv);
+                const bar = document.getElementById('heart-bar'), zone = document.getElementById('safe-zone');
+                let pos = 50, vel = 0, zonePos = 35, timeIn = 0;
+                const loop = setInterval(() => {
+                    vel += (Math.random() - 0.5) * 2; pos += vel; vel *= 0.95;
+                    if(pos < 0) pos = 0; if(pos > 95) pos = 95; bar.style.left = pos + "%";
+                    zonePos += (Math.random() - 0.5) * 4; if(zonePos < 0) zonePos = 0; if(zonePos > 70) zonePos = 70; zone.style.left = zonePos + "%";
+                    if(pos >= zonePos && pos <= zonePos + 30) { timeIn += 0.02; if(timeIn >= 2) { clearInterval(loop); finish(true); } }
+                }, 20);
+                const push = () => { vel += pos < 50 ? 3 : -3; };
+                window.addEventListener('keydown', (e) => { if(e.code === 'Space') push(); });
+                gameDiv.onclick = push;
             },
             resolveChest(chest, success) {
                 if (success) {
@@ -605,13 +661,12 @@
                             setTimeout(() => { State.relics = 0; State.level++; this.generateLevel(); UI.update(); }, 1500);
                         }
                     } else UI.log("📦 O baú estava vazio...");
-                } else { UI.log("💀 Falha! O Fantasma despertou!"); State.ghost.active = true; }
+                } else { UI.log("💀 Falha! O Fantasma despertou!"); State.ghost.active = true; State.ghostWaitTurn = true; }
                 if (State.players[State.turn].curM <= 0) this.passTurn();
                 UI.update();
             },
             useAbility() {
-                let p = State.players[State.turn];
-                if (p.usedAbility || State.isBusy) return;
+                let p = State.players[State.turn]; if (p.usedAbility || State.isBusy) return;
                 let success = false;
                 switch(p.id) {
                     case 'atleta': p.curM += 3; UI.log("🏃 Atleta usou fôlego extra!"); success = true; break;
@@ -626,12 +681,10 @@
             },
             moveGhost() {
                 if (!State.ghost.active) return;
+                if (State.ghostWaitTurn) { State.ghostWaitTurn = false; UI.log("👻 O Fantasma está se materializando..."); return; }
                 let target = null, minDist = Infinity;
-                State.players.forEach(p => {
-                    let d = Math.abs(p.x - State.ghost.x) + Math.abs(p.y - State.ghost.y);
-                    if (d < minDist) { minDist = d; target = p; }
-                });
-                let moves = State.ghost.slow ? 1 : 2;
+                State.players.forEach(p => { let d = Math.abs(p.x - State.ghost.x) + Math.abs(p.y - State.ghost.y); if (d < minDist) { minDist = d; target = p; } });
+                let moves = State.ghost.slow ? 1 : 3;
                 for (let i = 0; i < moves; i++) {
                     if (State.ghost.x < target.x) State.ghost.x++; else if (State.ghost.x > target.x) State.ghost.x--;
                     else if (State.ghost.y < target.y) State.ghost.y++; else if (State.ghost.y > target.y) State.ghost.y--;
@@ -640,22 +693,19 @@
             },
             passTurn() {
                 if (State.isBusy || !State.gameActive) return;
-                let p = State.players[State.turn];
-                p.curM = p.moves; p.usedAbility = false;
+                let p = State.players[State.turn]; p.curM = p.moves; p.usedAbility = false;
                 State.turn = (State.turn + 1) % State.players.length;
                 if (State.turn === 0) this.moveGhost();
-                UI.update(); UI.log(`Turno de: ${State.players[State.turn].name}`);
+                this.startTurnTimer(); UI.update(); UI.log(`Turno de: ${State.players[State.turn].name}`);
             },
             gameOver(win, message) {
-                State.gameActive = false;
+                State.gameActive = false; if (State.turnTimer) clearInterval(State.turnTimer); if (State.mgTimer) clearInterval(State.mgTimer);
                 const screen = document.getElementById('game-over-screen');
                 document.getElementById('go-title').textContent = win ? "VITÓRIA!" : "DERROTA";
-                document.getElementById('go-message').textContent = message;
-                screen.classList.remove('hidden');
+                document.getElementById('go-message').textContent = message; screen.classList.remove('hidden');
             },
             gameLoop() { Renderer.draw(); requestAnimationFrame(() => this.gameLoop()); }
         };
-
         window.onload = () => GameLogic.init();
     </script>
 </body>

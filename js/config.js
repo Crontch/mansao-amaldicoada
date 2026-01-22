@@ -2,6 +2,8 @@ const CONFIG = {
     gridSize: 12,
     tileSize: 60,
     relicsNeeded: 3,
+    turnTimeLimit: 60,
+    minigameTimeLimit: 40,
     classes: [
         { id: 'atleta', name: 'Atleta', sym: '🏃', moves: 5, color: '#e74c3c', abilityDesc: 'Corrida Extra (+3 mov)' },
         { id: 'ladrao', name: 'Ladrão', sym: '🕵️', moves: 4, color: '#2ecc71', abilityDesc: 'Abrir Baú Adjacente' },
@@ -35,5 +37,9 @@ let State = {
     },
     isBusy: false,
     gameActive: false,
-    level: 1
+    level: 1,
+    turnTimer: null,
+    mgTimer: null,
+    timeLeft: 0,
+    ghostWaitTurn: false
 };
